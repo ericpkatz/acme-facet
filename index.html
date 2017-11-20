@@ -166,8 +166,10 @@
      * SET UP COMPONENT Filter 
      *********************/
 
-    const _Filter = ({ optionsList })=> {
-      console.log(optionsList);
+    const _Filter = ({ optionsList, onFilter, filter })=> {
+      const _onFilter = (el)=> {
+        onFilter({ filter, value: el.target.value, name: el.target.name });
+      };
       return (
         <div>
           Filter:
@@ -176,7 +178,7 @@
               return (
                 <div key={ option.name }>
                   { option.name }
-                  <select className='form-control'>
+                  <select defaultValue={ filter[option.name] || 'all' } className='form-control' name={ option.name} onChange={ _onFilter }>
                   {
                     option.options.map( val => {
                       return (
@@ -194,16 +196,23 @@
     };
 
     const filterMapper = ({ products })=> {
+      const generateOptions = (products, attr)=> {
+        const options = products.reduce((memo, product)=> {
+          const found = memo.find( item => item === product[attr] );
+          if(!found){
+            //does this attribute make sense
+            memo.push(product[attr]);
+          }
+          return memo;
+        }, []);
+
+        return ['all', ...options];
+      };
+
       const optionsList = ['color', 'status'].map( attr => {
         return {
           name: attr,
-          options: products.reduce((memo, product)=> {
-            const found = memo.find( item => item === product[attr] );
-            if(!found){
-              memo.push(product[attr]);
-            }
-            return memo;
-          }, [])
+          options: generateOptions(products, attr) 
         };
       });
       return {
@@ -211,7 +220,21 @@
       };
     };
 
-    const Filter = connect(filterMapper)(_Filter);
+    const filterDispatcher = (dispatch, { history })=> {
+      return {
+        onFilter: ({filter, value, name })=> {
+          const change = { };
+          change[name] = value;
+          const _filter = Object.assign({}, filter, change); 
+          if(value === 'all'){
+            delete _filter[name];
+          }
+          history.push(`/products/${ Object.keys(_filter).length === 0 ? '' :JSON.stringify( _filter )}`);
+        }
+      };
+    };
+
+    const Filter = connect(filterMapper, filterDispatcher)(_Filter);
     
       
       
@@ -219,11 +242,10 @@
      * SET UP COMPONENT Products
      *********************/
     
-      const _Products = ({products, filter}) => {
-        console.log(filter);
+      const _Products = ({products, filter, history}) => {
         return (
           <div>
-          <Filter filter={ filter }/>
+          <Filter filter={ filter } history={ history } />
           <div className='well'>
             Products
             ({ products.length}) 
@@ -241,16 +263,32 @@
           </div>
         );
       };
-      const productsMapper = ({products}, { match })=> {
+      const productsMapper = ({products}, { match, history })=> {
         let filter = {};
         try{
           filter = JSON.parse(match.params.filter);
         }
         catch(ex){
         }
+
+        var filteredValues = Object.keys(filter).reduce((memo, key)=> {
+          memo.push(filter[key]);
+          return memo;
+        },[]).join(',');
+
+        const filtered = products.filter( product => {
+          //do attributes of product match filter
+
+          var attr = Object.keys(filter).reduce( (memo, key) => {
+            memo.push(product[key]);
+            return memo;
+          }, []);
+          return attr.join(',') === filteredValues;
+        });
         return {
-          products,
-          filter
+          products: filtered,
+          filter,
+          history
         };
       };
       const Products = connect(productsMapper)(_Products); 
