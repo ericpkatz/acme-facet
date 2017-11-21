@@ -166,19 +166,21 @@
      * SET UP COMPONENT Filter 
      *********************/
 
-    const _Filter = ({ optionsList, onFilter, filter })=> {
+    const _Filter = ({ optionsList, onFilter, filter, isEmpty })=> {
       const _onFilter = (el)=> {
         onFilter({ filter, value: el.target.value, name: el.target.name });
       };
       return (
-        <div>
-          Filter:
+        <div className='well'>
+          {
+            isEmpty ? 'Filter' : (<Link to='/products'>Filter</Link>) 
+          }
           {
             optionsList.map( option => {
               return (
                 <div key={ option.name }>
                   { option.name }
-                  <select defaultValue={ filter[option.name] || 'all' } className='form-control' name={ option.name} onChange={ _onFilter }>
+                  <select value={ filter[option.name] || 'all' } className='form-control' name={ option.name} onChange={ _onFilter }>
                   {
                     option.options.map( val => {
                       return (
@@ -195,12 +197,29 @@
       );
     };
 
-    const filterMapper = ({ products })=> {
+    const notEmpty = ({ name, value, filter, products })=> {
+      const obj = {};
+      obj[name] = value;
+      const _filter = Object.assign({}, filter, obj); 
+      var filteredValues = Object.keys(_filter).reduce((memo, key)=> {
+        memo.push(_filter[key]);
+        return memo;
+      },[]).join(',');
+
+      const filtered = products.filter( product => {
+        var attr = Object.keys(_filter).reduce( (memo, key) => {
+          memo.push(product[key]);
+          return memo;
+        }, []);
+        return attr.join(',') === filteredValues;
+      });
+      return filtered.length;
+    }
+    const filterMapper = ({ products }, { filter })=> {
       const generateOptions = (products, attr)=> {
         const options = products.reduce((memo, product)=> {
           const found = memo.find( item => item === product[attr] );
-          if(!found){
-            //does this attribute make sense
+          if(!found && notEmpty({ name: attr, value: product[attr], filter, products })){
             memo.push(product[attr]);
           }
           return memo;
@@ -216,7 +235,8 @@
         };
       });
       return {
-        optionsList
+        optionsList,
+        isEmpty: Object.keys(filter).length === 0
       };
     };
 
@@ -277,8 +297,6 @@
         },[]).join(',');
 
         const filtered = products.filter( product => {
-          //do attributes of product match filter
-
           var attr = Object.keys(filter).reduce( (memo, key) => {
             memo.push(product[key]);
             return memo;
