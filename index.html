@@ -197,41 +197,40 @@
       );
     };
 
-    const notEmpty = ({ name, value, filter, products })=> {
-      const obj = {};
-      obj[name] = value;
-      const _filter = Object.assign({}, filter, obj); 
-      var filteredValues = Object.keys(_filter).reduce((memo, key)=> {
-        memo.push(_filter[key]);
+    //given a filter generate a string which represents filter
+    const generateFilterString = (filter)=> {
+      return Object.keys(filter).reduce((memo, key)=> {
+        memo.push(filter[key]);
         return memo;
       },[]).join(',');
 
-      const filtered = products.filter( product => {
-        var attr = Object.keys(_filter).reduce( (memo, key) => {
-          memo.push(product[key]);
-          return memo;
-        }, []);
-        return attr.join(',') === filteredValues;
-      });
-      return filtered.length;
     }
-    const filterMapper = ({ products }, { filter })=> {
-      const generateOptions = (products, attr)=> {
-        const options = products.reduce((memo, product)=> {
-          const found = memo.find( item => item === product[attr] );
-          if(!found && notEmpty({ name: attr, value: product[attr], filter, products })){
-            memo.push(product[attr]);
-          }
-          return memo;
-        }, []);
 
-        return ['all', ...options];
-      };
+    const notEmpty = ({ name, value, filter, products })=> {
+      const _filter = generateNewFilter({filter, name, value }); 
+      const filtered =  filterProducts(products, _filter);
+      return !!filtered.length;
+    }
+
+
+    const generateOptions = (products, attr, filter)=> {
+      const options = products.reduce((memo, product)=> {
+        const found = memo.find( item => item === product[attr] );
+        if(!found && notEmpty({ name: attr, value: product[attr], filter, products })){
+          memo.push(product[attr]);
+        }
+        return memo;
+      }, []);
+
+      return ['all', ...options];
+    };
+
+    const filterMapper = ({ products }, { filter })=> {
 
       const optionsList = ['color', 'status'].map( attr => {
         return {
           name: attr,
-          options: generateOptions(products, attr) 
+          options: generateOptions(products, attr, filter) 
         };
       });
       return {
@@ -240,15 +239,20 @@
       };
     };
 
+    const generateNewFilter = ({ filter, name, value })=> {
+      const change = { };
+      change[name] = value;
+      const _filter = Object.assign({}, filter, change); 
+      if(value === 'all'){
+        delete _filter[name];
+      }
+      return _filter;
+    }
+
     const filterDispatcher = (dispatch, { history })=> {
       return {
         onFilter: ({filter, value, name })=> {
-          const change = { };
-          change[name] = value;
-          const _filter = Object.assign({}, filter, change); 
-          if(value === 'all'){
-            delete _filter[name];
-          }
+          const _filter = generateNewFilter({ filter, name, value });
           history.push(`/products/${ Object.keys(_filter).length === 0 ? '' :JSON.stringify( _filter )}`);
         }
       };
@@ -283,6 +287,23 @@
           </div>
         );
       };
+
+      const filterProducts = (products, filter)=> {
+        var filterString = generateFilterString(filter);
+
+        return products.filter( product => {
+          return isProductMatch(product, filterString, filter);
+        });
+      }
+
+      const isProductMatch = (product, filterString, filter)=> {
+        var attr = Object.keys(filter).reduce( (memo, key) => {
+          memo.push(product[key]);
+          return memo;
+        }, []);
+        return attr.join(',') === filterString;
+      }
+
       const productsMapper = ({products}, { match, history })=> {
         let filter = {};
         try{
@@ -291,20 +312,8 @@
         catch(ex){
         }
 
-        var filteredValues = Object.keys(filter).reduce((memo, key)=> {
-          memo.push(filter[key]);
-          return memo;
-        },[]).join(',');
-
-        const filtered = products.filter( product => {
-          var attr = Object.keys(filter).reduce( (memo, key) => {
-            memo.push(product[key]);
-            return memo;
-          }, []);
-          return attr.join(',') === filteredValues;
-        });
         return {
-          products: filtered,
+          products: filterProducts(products, filter),
           filter,
           history
         };
