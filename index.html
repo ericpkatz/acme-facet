@@ -203,42 +203,37 @@
         memo.push(filter[key]);
         return memo;
       },[]).join(',');
-
     }
 
-    const notEmpty = ({ name, value, filter, products })=> {
+    //see if a specific filter will lead to a dead end
+    const hasResults = ({ name, value, filter, products })=> {
       const _filter = generateNewFilter({filter, name, value }); 
-      const filtered =  filterProducts(products, _filter);
+      const filtered =  filterProducts({ products, filter: _filter});
       return !!filtered.length;
     }
 
-
-    const generateOptions = (products, attr, filter)=> {
+    //given an attribute a filter and products, generate a string of options
+    const generateOptionsForAttribute = ({ products, attr, filter })=> {
       const options = products.reduce((memo, product)=> {
         const found = memo.find( item => item === product[attr] );
-        if(!found && notEmpty({ name: attr, value: product[attr], filter, products })){
+        if(!found && hasResults({ name: attr, value: product[attr], filter, products })){
           memo.push(product[attr]);
         }
         return memo;
       }, []);
-
       return ['all', ...options];
     };
 
-    const filterMapper = ({ products }, { filter })=> {
+    //create list of products from a filter
+    const filterProducts = ({ products, filter })=> {
+      var filterString = generateFilterString(filter);
 
-      const optionsList = ['color', 'status'].map( attr => {
-        return {
-          name: attr,
-          options: generateOptions(products, attr, filter) 
-        };
+      return products.filter( product => {
+        return isProductMatch({ product, filterString, filter });
       });
-      return {
-        optionsList,
-        isEmpty: Object.keys(filter).length === 0
-      };
-    };
+    }
 
+    //generates a new filter with a new name and filter
     const generateNewFilter = ({ filter, name, value })=> {
       const change = { };
       change[name] = value;
@@ -248,6 +243,40 @@
       }
       return _filter;
     }
+
+    //convert a product to filter string
+    const productToFilterString = ({ product, filter })=> {
+      return Object.keys(filter).reduce( (memo, key) => {
+        memo.push(product[key]);
+        return memo;
+      }, []).join(',');
+    };
+
+    //does product match a filter string
+    const isProductMatch = ({ product, filterString, filter })=> {
+      return productToFilterString({ product, filter }) === filterString;
+    }
+
+    //is the filter empty?
+    const isEmptyFilter = (filter)=> {
+      return Object.keys(filter).length === 0;
+    }
+
+
+    const filterMapper = ({ products }, { filter })=> {
+      //generate options list
+      const optionsList = ['color', 'status'].map( attr => {
+        return {
+          name: attr,
+          options: generateOptionsForAttribute({ products, attr, filter }) 
+        };
+      });
+      return {
+        optionsList,
+        isEmpty: isEmptyFilter(filter)
+      };
+    };
+
 
     const filterDispatcher = (dispatch, { history })=> {
       return {
@@ -288,21 +317,6 @@
         );
       };
 
-      const filterProducts = (products, filter)=> {
-        var filterString = generateFilterString(filter);
-
-        return products.filter( product => {
-          return isProductMatch(product, filterString, filter);
-        });
-      }
-
-      const isProductMatch = (product, filterString, filter)=> {
-        var attr = Object.keys(filter).reduce( (memo, key) => {
-          memo.push(product[key]);
-          return memo;
-        }, []);
-        return attr.join(',') === filterString;
-      }
 
       const productsMapper = ({products}, { match, history })=> {
         let filter = {};
@@ -313,7 +327,7 @@
         }
 
         return {
-          products: filterProducts(products, filter),
+          products: filterProducts({ products, filter }),
           filter,
           history
         };
