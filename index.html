@@ -198,6 +198,7 @@
     };
 
     //given a filter generate a string which represents filter
+    //{ foo: 'bar', bazz: 'quq' } would generate 'quq,bar'
     const generateFilterString = (filter)=> {
       return Object.keys(filter).reduce((memo, key)=> {
         memo.push(filter[key]);
@@ -212,6 +213,18 @@
       return !!filtered.length;
     }
 
+    //generates a new filter with a new name and filter
+    //a value of 'all' will remove the key
+    const generateNewFilter = ({ filter, name, value })=> {
+      const change = { };
+      change[name] = value;
+      const _filter = Object.assign({}, filter, change); 
+      if(value === 'all'){
+        delete _filter[name];
+      }
+      return _filter;
+    }
+
     //given an attribute a filter and products, generate a string of options
     const generateOptionsForAttribute = ({ products, attr, filter })=> {
       const options = products.reduce((memo, product)=> {
@@ -224,25 +237,17 @@
       return ['all', ...options];
     };
 
+    //example of composition - returns a function which can be used to filter products
+    const productsFilter = (products)=> (filterFn)=> products.filter(filterFn);
+
     //create list of products from a filter
     const filterProducts = ({ products, filter })=> {
+      //note this could be one expression
       var filterString = generateFilterString(filter);
-
-      return products.filter( product => {
-        return isProductMatch({ product, filterString, filter });
-      });
+      const _productsFilter = productsFilter(products);
+      return _productsFilter((product)=> isProductMatch({product, filterString, filter}));
     }
 
-    //generates a new filter with a new name and filter
-    const generateNewFilter = ({ filter, name, value })=> {
-      const change = { };
-      change[name] = value;
-      const _filter = Object.assign({}, filter, change); 
-      if(value === 'all'){
-        delete _filter[name];
-      }
-      return _filter;
-    }
 
     //convert a product to filter string
     const productToFilterString = ({ product, filter })=> {
